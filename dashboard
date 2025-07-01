@@ -1,0 +1,492 @@
+<html lang="pt-BR" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Interativo: Como embalagem e preço alteram a percepção</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'glam-pink': '#f70f62',
+                        'glam-gold': '#d4a371',
+                        'glam-yellow': '#fbf19c',
+                        'glam-bg': '#f6e9e1',
+                        'dark-bg': '#2c2a29',
+                        'dark-card': '#3d3a39',
+                        'dark-text': '#f0e5dd',
+                        'dark-subtle': '#8a817c',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Lato', sans-serif;
+            transition: background-color 0.5s ease, color 0.5s ease;
+        }
+        .font-title { font-family: 'Montserrat', sans-serif; }
+        .kpi-card, .chart-container, .filter-bar, .banner {
+            background-color: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.5s ease;
+        }
+        .dark .kpi-card, .dark .chart-container, .dark .filter-bar, .dark .banner {
+            background-color: rgba(61, 58, 57, 0.6); /* dark-card with opacity */
+            border-color: rgba(240, 229, 221, 0.1);
+        }
+        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .dark .kpi-card:hover { box-shadow: 0 10px 20px rgba(247, 15, 98, 0.1); }
+        .modal { transition: opacity 0.3s ease; }
+        .gemini-button {
+            background-color: #f70f62; /* glam-pink */
+            color: white;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .gemini-button:hover { background-color: #d60d56; transform: scale(1.05); }
+        .gemini-button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #f70f62; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .info-icon { cursor: pointer; transition: transform 0.2s ease; }
+        .info-icon:hover { transform: scale(1.2); }
+        
+        /* Ensure chart canvas parent is relative for proper sizing */
+        .chart-canvas-wrapper {
+            position: relative;
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="bg-glam-bg dark:bg-dark-bg text-gray-800 dark:text-dark-text">
+
+    <div class="container mx-auto p-4 md:p-8 relative">
+        
+        <!-- Banner -->
+        <div class="flex justify-center items-center mb-4">
+            <div class="banner p-3 rounded-xl shadow-sm text-center max-w-4xl">
+                <p class="font-title text-sm font-bold text-glam-pink dark:text-glam-yellow">Insights para produto, marca e tendências de beleza — Análise de dados e inteligência de negócio | Juliana Kirschnick</p>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-title font-black text-glam-pink tracking-tight">Como embalagem e preço alteram a percepção de um mesmo produto?</h1>
+            <p class="mt-2 text-lg text-gray-600 dark:text-dark-subtle">Study case: Suave & Evaus por Juliana Kirschnick</p>
+        </header>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+            <div id="kpi-search-interest" class="kpi-card p-5 rounded-2xl shadow-md">
+                <h3 class="font-title text-gray-500 dark:text-dark-subtle text-sm">INTERESSE DE BUSCA</h3>
+                <p class="text-3xl font-bold font-title text-glam-pink">+0%</p>
+                <p class="text-sm text-gray-500 dark:text-dark-subtle">Google Trends (Evaus vs. Suave)</p>
+            </div>
+            <div id="kpi-tiktok-mentions" class="kpi-card p-5 rounded-2xl shadow-md">
+                <h3 class="font-title text-gray-500 dark:text-dark-subtle text-sm">MENÇÕES NO TIKTOK</h3>
+                <p class="text-3xl font-bold font-title text-glam-pink">0</p>
+                <p class="text-sm text-gray-500 dark:text-dark-subtle">Total no período selecionado</p>
+            </div>
+            <div id="kpi-reviews" class="kpi-card p-5 rounded-2xl shadow-md">
+                <h3 class="font-title text-gray-500 dark:text-dark-subtle text-sm">Nº DE REVIEWS AGREGADOS</h3>
+                <p class="text-3xl font-bold font-title text-glam-pink">0</p>
+                <p class="text-sm text-gray-500 dark:text-dark-subtle">E-commerces e Marketplaces</p>
+            </div>
+            <div id="kpi-avg-score" class="kpi-card p-5 rounded-2xl shadow-md">
+                <h3 class="font-title text-gray-500 dark:text-dark-subtle text-sm">SCORE MÉDIO DE REVIEWS</h3>
+                <p class="text-3xl font-bold font-title text-glam-pink">0.0 ★</p>
+                <p class="text-sm text-gray-500 dark:text-dark-subtle">Média ponderada</p>
+            </div>
+        </div>
+
+        <!-- Filters & AI Button -->
+        <div class="filter-bar p-4 rounded-2xl mb-8 shadow-sm flex flex-wrap gap-4 items-center justify-center">
+            <select id="filter-brand" class="bg-white dark:bg-dark-card border border-gray-300 dark:border-dark-subtle rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-glam-pink">
+                <option value="all">Todas as Marcas</option>
+                <option value="Suave">Apenas Suave</option>
+                <option value="Evaus">Apenas Evaus</option>
+            </select>
+            <select id="filter-channel" class="bg-white dark:bg-dark-card border border-gray-300 dark:border-dark-subtle rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-glam-pink">
+                <option value="all">Todos os Canais</option>
+                <option value="Instagram">Instagram</option>
+                <option value="YouTube">YouTube</option>
+                <option value="TikTok">TikTok</option>
+                <option value="E-commerces">E-commerces</option>
+            </select>
+            <select id="filter-product" class="bg-white dark:bg-dark-card border border-gray-300 dark:border-dark-subtle rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-glam-pink">
+                <option value="all">Todos os Produtos</option>
+                <option value="Shampoo">Shampoo</option>
+                <option value="Condicionador">Condicionador</option>
+            </select>
+            <button id="ai-insight-btn" class="gemini-button font-bold py-2 px-6 rounded-lg shadow-md text-sm">
+                ✨ Entender com IA ✨
+            </button>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <div class="chart-container p-4 rounded-2xl shadow-lg col-span-1 lg:col-span-5">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-title font-bold">Evolução de Menções Positivas (Social Listening)</h3>
+                    <img src="https://placehold.co/24x24/f70f62/ffffff?text=i" alt="Info" class="info-icon" data-chart-id="lineChartInfo">
+                </div>
+                <div class="chart-canvas-wrapper" style="height:300px;">
+                    <canvas id="lineChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container p-4 rounded-2xl shadow-lg col-span-1 lg:col-span-3">
+                 <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-title font-bold">Volume de Vendas vs. Preço Médio</h3>
+                    <img src="https://placehold.co/24x24/f70f62/ffffff?text=i" alt="Info" class="info-icon" data-chart-id="comboChartInfo">
+                </div>
+                <div class="chart-canvas-wrapper" style="height:400px;">
+                    <canvas id="comboChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container p-4 rounded-2xl shadow-lg col-span-1 lg:col-span-2">
+                 <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-title font-bold">Preço vs. Score de Review</h3>
+                    <img src="https://placehold.co/24x24/f70f62/ffffff?text=i" alt="Info" class="info-icon" data-chart-id="scatterChartInfo">
+                </div>
+                <div class="chart-canvas-wrapper" style="height:400px;">
+                    <canvas id="scatterChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container p-4 rounded-2xl shadow-lg col-span-1 lg:col-span-5">
+                 <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-title font-bold text-center w-full">Distribuição de Vendas por Segmento</h3>
+                    <img src="https://placehold.co/24x24/f70f62/ffffff?text=i" alt="Info" class="info-icon" data-chart-id="donutChartInfo">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="text-center">
+                        <h4 class="font-title font-bold mb-2 text-gray-700 dark:text-dark-subtle text-sm">Shampoo: Farmácia vs. Premium</h4>
+                        <div class="chart-canvas-wrapper" style="height: 300px;">
+                            <canvas id="shampooDonutChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <h4 class="font-title font-bold mb-2 text-gray-700 dark:text-dark-subtle text-sm">Condicionador: Farmácia vs. Premium</h4>
+                        <div class="chart-canvas-wrapper" style="height: 300px;">
+                            <canvas id="conditionerDonutChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Drill-down & AI Insights -->
+    <div id="main-modal" class="modal fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 opacity-0 pointer-events-none z-50">
+        <div class="bg-glam-bg dark:bg-dark-card rounded-2xl shadow-2xl p-6 w-full max-w-2xl transform scale-95 transition-transform duration-300">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="modal-title" class="text-2xl font-title font-bold text-glam-pink">Detalhes</h2>
+                <button id="modal-close-btn" class="text-gray-500 hover:text-gray-800 dark:text-dark-subtle dark:hover:text-dark-text text-3xl">&times;</button>
+            </div>
+            <div id="modal-content" class="max-h-[60vh] overflow-y-auto pr-2 text-gray-700 dark:text-dark-text">
+                <!-- Content will be injected by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Theme Toggle -->
+    <label for="theme-toggle" class="fixed bottom-8 left-5 z-50 flex flex-col items-center cursor-pointer p-2 rounded-full bg-white/[.20] dark:bg-dark-card/[.20] backdrop-blur-sm shadow-lg border border-white/20 dark:border-dark-text/10">
+        <input type="checkbox" id="theme-toggle" class="sr-only peer">
+        <span class="text-xl transition-opacity duration-300 opacity-100 peer-checked:opacity-50">☀️</span>
+        <div class="relative my-2">
+            <div class="block bg-glam-gold/[.20] w-8 h-14 rounded-full"></div>
+            <div class="dot absolute left-1 top-1 bg-white/[.20] w-6 h-6 rounded-full transition-transform duration-300 ease-in-out peer-checked:translate-y-6"></div>
+        </div>
+        <span class="text-xl transition-opacity duration-300 opacity-50 peer-checked:opacity-100">🌙</span>
+    </label>
+
+
+    <script>
+    // --- MOCK DATA SIMULATION ---
+    const mockData = [];
+    const startDate = new Date('2023-01-01');
+    const endDate = new Date('2024-12-31');
+    const rebrandingDate = new Date('2024-01-01');
+
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 15)) {
+        const isEvausPeriod = d >= rebrandingDate;
+        const brand = isEvausPeriod ? 'Evaus' : 'Suave';
+        const segment = isEvausPeriod ? 'Premium' : 'Farmácia';
+        const channels = ['Instagram', 'YouTube', 'TikTok', 'E-commerces'];
+        const categories = ['Shampoo', 'Condicionador'];
+
+        for (let i = 0; i < 2; i++) {
+            const category = categories[Math.floor(Math.random() * categories.length)];
+            const channel = channels[Math.floor(Math.random() * channels.length)];
+            
+            let basePrice = isEvausPeriod ? 70 + Math.random() * 50 : 15 + Math.random() * 15;
+            let salesVolume = isEvausPeriod ? 400 + Math.floor(Math.random() * 500) : 300 + Math.floor(Math.random() * 400);
+            let positiveMentions = isEvausPeriod ? 200 + Math.floor(Math.random() * 250) : 20 + Math.floor(Math.random() * 50);
+            let reviewScore = isEvausPeriod ? 4.1 + Math.random() * 0.7 : 3.9 + Math.random() * 0.8;
+            const ingredients = isEvausPeriod ? (Math.random() > 0.3 ? 'Natural' : 'Sintético') : (Math.random() > 0.7 ? 'Natural' : 'Sintético');
+            
+            let searchInterest = isEvausPeriod ? 60 + Math.random() * 40 : 10 + Math.random() * 10;
+            let reviewCount = isEvausPeriod ? 5 + Math.floor(Math.random() * 15) : 2 + Math.floor(Math.random() * 5);
+
+            if (channel === 'TikTok') { positiveMentions *= 2.5; salesVolume *= 0.7; } 
+            else if (channel === 'E-commerces') { salesVolume *= 1.8; positiveMentions *= 0.5; reviewCount *= 3; } 
+            else if (channel === 'Instagram') { positiveMentions *= 1.2; salesVolume *= 1.1; }
+            
+            mockData.push({ id: mockData.length + 1, date: new Date(d), brand: brand, productName: `${brand} ${category} ${ingredients}`, category: category, segment: segment, price: parseFloat(basePrice.toFixed(2)), salesVolume: Math.round(salesVolume), positiveMentions: Math.round(positiveMentions), reviewScore: parseFloat(reviewScore.toFixed(2)), reviewCount: Math.round(reviewCount), searchInterest: Math.round(searchInterest), ingredients: ingredients, channel: channel });
+        }
+    }
+    
+    // --- CHART INFO CONTENT ---
+    const chartInfoContent = {
+        lineChartInfo: {
+            title: "Análise: Evolução de Menções Positivas",
+            explanation: "Este gráfico de linhas compara o volume de menções positivas nas redes sociais para a marca 'Suave' (antes do rebranding) e 'Evaus' (pós-rebranding). Ele demonstra como a percepção da marca evoluiu ao longo do tempo.",
+            source: "TikTok API, APIs de Social Listening (Simulado).",
+            insight: "O insight-chave é o crescimento exponencial de menções positivas para 'Evaus' após o rebranding, mesmo com um preço mais elevado. Isso sugere que a nova identidade visual, embalagem e comunicação geraram um 'buzz' significativamente maior e mais favorável, validando a tese de que a percepção de valor foi alterada com sucesso."
+        },
+        comboChartInfo: {
+            title: "Análise: Volume de Vendas vs. Preço Médio",
+            explanation: "Este gráfico combinado exibe o volume de vendas (barras) e o preço médio (linha) para os produtos mais vendidos. Permite analisar a correlação entre o preço de um produto e sua popularidade em vendas.",
+            source: "E-commerce & Marketplace APIs (Simulado).",
+            insight: "Observa-se que, apesar do preço médio superior, os produtos da marca 'Evaus' (que aparecem no topo do ranking pós-rebranding) alcançam volumes de venda comparáveis ou até maiores que os da 'Suave'. Isso reforça que o consumidor está disposto a pagar mais por um produto com maior valor percebido, impulsionado pela marca e embalagem."
+        },
+        scatterChartInfo: {
+            title: "Análise: Preço vs. Score de Review",
+            explanation: "Este gráfico de dispersão plota o preço de cada produto contra sua nota média de avaliação (review score). É uma ferramenta poderosa para entender se um preço mais alto corresponde a uma qualidade percebida (e avaliada) superior.",
+            source: "Open Beauty Facts, Ulta Beauty/CrawlFeeds, Gigasheet.",
+            insight: "O ponto crucial aqui é a ausência de uma correlação forte entre preço e score. Produtos 'Evaus' (mais caros) e 'Suave' (mais baratos) ocupam faixas de score muito similares. Isso indica que a qualidade intrínseca do produto (a fórmula) é percebida de forma parecida, e o grande diferencial de performance de mercado vem, de fato, do branding e da embalagem, não de uma qualidade superior."
+        },
+        donutChartInfo: {
+            title: "Análise: Distribuição de Vendas por Segmento",
+            explanation: "Estes gráficos de rosca mostram a participação de mercado (em volume de vendas) dos segmentos 'Farmácia' (representado pela Suave) e 'Premium' (representado pela Evaus) para Shampoo e Condicionador.",
+            source: "E-commerce & Marketplace APIs (Simulado).",
+            insight: "Os gráficos ilustram a dominância do segmento 'Premium' (Evaus) nas vendas após o rebranding. Isso demonstra uma migração de consumo ou a conquista de um novo público que valoriza o apelo estético e a experiência da marca 'Premium', mesmo que o produto base seja essencialmente o mesmo da versão de 'Farmácia'."
+        }
+    };
+
+    // --- DOM ELEMENTS & CHART INSTANCES ---
+    const themeToggle = document.getElementById('theme-toggle');
+    const filterBrand = document.getElementById('filter-brand');
+    const filterChannel = document.getElementById('filter-channel');
+    const filterProduct = document.getElementById('filter-product');
+    const modal = document.getElementById('main-modal');
+    const modalCloseBtn = document.getElementById('modal-close-btn');
+    const modalContent = document.getElementById('modal-content');
+    const modalTitle = document.getElementById('modal-title');
+    const aiInsightBtn = document.getElementById('ai-insight-btn');
+    let lineChart, comboChart, scatterChart, shampooDonutChart, conditionerDonutChart;
+
+    // --- THEME SWITCHER ---
+    themeToggle.addEventListener('change', () => {
+        document.documentElement.classList.toggle('dark', themeToggle.checked);
+        updateDashboard(); // Redraw charts for theme change
+    });
+
+    // --- CHART.JS GLOBAL CONFIG ---
+    function getChartColors() {
+        const isDark = document.documentElement.classList.contains('dark');
+        return {
+            textColor: isDark ? '#f0e5dd' : '#4a5568',
+            gridColor: isDark ? 'rgba(240, 229, 221, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+            suaveColor: '#d4a371',
+            evausColor: '#f70f62',
+            donutColors: ['#d4a371', '#f70f62', '#fbf19c']
+        };
+    }
+    
+    Chart.defaults.font.family = "'Lato', sans-serif";
+    Chart.defaults.plugins.legend.position = 'bottom';
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+
+    // --- MAIN UPDATE FUNCTION ---
+    function updateDashboard() {
+        const selectedBrand = filterBrand.value;
+        const selectedChannel = filterChannel.value;
+        const selectedProduct = filterProduct.value;
+
+        const filteredData = mockData.filter(d => 
+            (selectedBrand === 'all' || d.brand === selectedBrand) &&
+            (selectedChannel === 'all' || d.channel === selectedChannel) &&
+            (selectedProduct === 'all' || d.category === selectedProduct)
+        );
+        
+        const colors = getChartColors();
+        Chart.defaults.color = colors.textColor;
+        Chart.defaults.borderColor = colors.gridColor;
+
+        updateKPIs(filteredData);
+        updateLineChart(filteredData, colors);
+        updateComboChart(filteredData, colors);
+        updateScatterChart(filteredData, colors);
+        updateDistributionDonuts(filteredData, colors);
+    }
+
+    // --- KPI UPDATE LOGIC ---
+    function updateKPIs(data) {
+        const formatNumber = (value) => new Intl.NumberFormat('pt-BR').format(value);
+        const suaveDataInterest = mockData.filter(d => d.brand === 'Suave');
+        const evausDataInterest = mockData.filter(d => d.brand === 'Evaus');
+        const avgInterestSuave = suaveDataInterest.length > 0 ? suaveDataInterest.reduce((sum, d) => sum + d.searchInterest, 0) / suaveDataInterest.length : 0;
+        const avgInterestEvaus = evausDataInterest.length > 0 ? evausDataInterest.reduce((sum, d) => sum + d.searchInterest, 0) / evausDataInterest.length : 0;
+        const interestChange = avgInterestSuave > 0 ? ((avgInterestEvaus - avgInterestSuave) / avgInterestSuave) * 100 : 0;
+        document.querySelector('#kpi-search-interest p:nth-child(2)').textContent = `+${interestChange.toFixed(0)}%`;
+        const tiktokMentions = data.filter(d => d.channel === 'TikTok').reduce((sum, d) => sum + d.positiveMentions, 0);
+        document.querySelector('#kpi-tiktok-mentions p:nth-child(2)').textContent = formatNumber(tiktokMentions);
+        const totalReviews = data.reduce((sum, d) => sum + d.reviewCount, 0);
+        document.querySelector('#kpi-reviews p:nth-child(2)').textContent = formatNumber(totalReviews);
+        const totalScoreWeight = data.reduce((sum, d) => sum + d.reviewScore * d.reviewCount, 0);
+        const totalReviewCount = data.reduce((sum, d) => sum + d.reviewCount, 0);
+        const avgScore = totalReviewCount > 0 ? totalScoreWeight / totalReviewCount : 0;
+        document.querySelector('#kpi-avg-score p:nth-child(2)').textContent = `${avgScore.toFixed(1)} ★`;
+    }
+
+    // --- CHART UPDATE FUNCTIONS ---
+    function updateLineChart(data, colors) { if (lineChart) lineChart.destroy(); const suaveData = data.filter(d => d.brand === 'Suave').reduce((acc, d) => { const dateStr = d.date.toISOString().slice(0, 7); acc[dateStr] = (acc[dateStr] || 0) + d.positiveMentions; return acc; }, {}); const evausData = data.filter(d => d.brand === 'Evaus').reduce((acc, d) => { const dateStr = d.date.toISOString().slice(0, 7); acc[dateStr] = (acc[dateStr] || 0) + d.positiveMentions; return acc; }, {}); const labels = [...new Set([...Object.keys(suaveData), ...Object.keys(evausData)])].sort(); lineChart = new Chart(document.getElementById('lineChart'), { type: 'line', data: { labels: labels, datasets: [{ label: 'Suave', data: labels.map(l => suaveData[l] || 0), borderColor: colors.suaveColor, backgroundColor: colors.suaveColor, tension: 0.3 }, { label: 'Evaus (Pós-rebranding)', data: labels.map(l => evausData[l] || 0), borderColor: colors.evausColor, backgroundColor: colors.evausColor, tension: 0.3, pointRadius: 5 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'month' }, grid: { display: false } }, y: { beginAtZero: true, title: { display: true, text: 'Nº de Menções Positivas' } } }, plugins: { tooltip: { mode: 'index', intersect: false, } } } }); }
+    function updateComboChart(data, colors) { if (comboChart) comboChart.destroy(); const salesByProduct = data.reduce((acc, d) => { if (!acc[d.productName]) { acc[d.productName] = { sales: 0, totalValue: 0, count: 0 }; } acc[d.productName].sales += d.salesVolume; acc[d.productName].totalValue += d.price * d.salesVolume; acc[d.productName].count += d.salesVolume; return acc; }, {}); const sortedProducts = Object.keys(salesByProduct).sort((a, b) => salesByProduct[b].sales - salesByProduct[a].sales).slice(0, 10); comboChart = new Chart(document.getElementById('comboChart'), { type: 'bar', data: { labels: sortedProducts, datasets: [{ label: 'Volume de Vendas', data: sortedProducts.map(p => salesByProduct[p].sales), backgroundColor: colors.suaveColor, yAxisID: 'y', order: 2 }, { label: 'Preço Médio (R$)', data: sortedProducts.map(p => salesByProduct[p].totalValue / salesByProduct[p].count), borderColor: colors.evausColor, backgroundColor: colors.evausColor, yAxisID: 'y1', type: 'line', order: 1, tension: 0.2 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { type: 'linear', position: 'left', title: { display: true, text: 'Volume de Vendas' } }, y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Preço Médio (R$)' } }, x: { ticks: { autoSkip: false, maxRotation: 45, minRotation: 45 } } } } }); }
+    function updateScatterChart(data, colors) { if (scatterChart) scatterChart.destroy(); scatterChart = new Chart(document.getElementById('scatterChart'), { type: 'scatter', data: { datasets: [{ label: 'Ingredientes Naturais', data: data.filter(d => d.ingredients === 'Natural').map(d => ({ x: d.price, y: d.reviewScore, product: d.productName })), backgroundColor: colors.suaveColor, pointRadius: 6, pointHoverRadius: 9 }, { label: 'Ingredientes Sintéticos', data: data.filter(d => d.ingredients === 'Sintético').map(d => ({ x: d.price, y: d.reviewScore, product: d.productName })), backgroundColor: colors.evausColor, pointRadius: 6, pointHoverRadius: 9 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'linear', position: 'bottom', title: { display: true, text: 'Preço (R$)' } }, y: { title: { display: true, text: 'Score de Review (0-5)' }, min: 3, max: 5 } }, plugins: { tooltip: { callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.parsed.y !== null) { label += `Score ${context.parsed.y.toFixed(1)} - R$ ${context.parsed.x.toFixed(2)}`; } return label; }, afterLabel: function(context) { return context.raw.product; } } } } } }); }
+    function updateDistributionDonuts(data, colors) { if (shampooDonutChart) shampooDonutChart.destroy(); if (conditionerDonutChart) conditionerDonutChart.destroy(); const donutOptions = { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'right', labels: { boxWidth: 15 } } } }; const shampooData = data.filter(d => d.category === 'Shampoo'); const shampooSegmentCounts = shampooData.reduce((acc, d) => { acc[d.segment] = (acc[d.segment] || 0) + d.salesVolume; return acc; }, {}); shampooDonutChart = new Chart(document.getElementById('shampooDonutChart'), { type: 'doughnut', data: { labels: Object.keys(shampooSegmentCounts), datasets: [{ data: Object.values(shampooSegmentCounts), backgroundColor: colors.donutColors }] }, options: donutOptions }); const conditionerData = data.filter(d => d.category === 'Condicionador'); const conditionerSegmentCounts = conditionerData.reduce((acc, d) => { acc[d.segment] = (acc[d.segment] || 0) + d.salesVolume; return acc; }, {}); conditionerDonutChart = new Chart(document.getElementById('conditionerDonutChart'), { type: 'doughnut', data: { labels: Object.keys(conditionerSegmentCounts), datasets: [{ data: Object.values(conditionerSegmentCounts), backgroundColor: colors.donutColors }] }, options: donutOptions }); }
+
+    // --- MODAL LOGIC ---
+    function openModal() { modal.classList.remove('opacity-0', 'pointer-events-none'); modal.querySelector('div > div').classList.remove('scale-95'); }
+    function closeModal() { modal.classList.add('opacity-0', 'pointer-events-none'); modal.querySelector('div > div').classList.add('scale-95'); }
+    modalCloseBtn.addEventListener('click', closeModal);
+
+    // --- INFO MODAL LOGIC ---
+    function showInfoModal(chartId) {
+        const content = chartInfoContent[chartId];
+        if (!content) return;
+        modalTitle.textContent = content.title;
+        modalContent.innerHTML = `
+            <div class="space-y-4">
+                <div>
+                    <h4 class="font-bold text-lg text-glam-pink">O que está sendo analisado?</h4>
+                    <p>${content.explanation}</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-lg text-glam-pink">Fonte dos Dados</h4>
+                    <p class="text-sm italic">${content.source}</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-lg text-glam-pink">Insight-Chave 🔑</h4>
+                    <p class="bg-yellow-100 dark:bg-glam-yellow/20 p-3 rounded-lg">${content.insight}</p>
+                </div>
+            </div>
+        `;
+        openModal();
+    }
+    
+    // --- GROQ API INTEGRATION ---
+    async function callLLMAPI(prompt, buttonElement, outputElement) {
+        buttonElement.disabled = true;
+        outputElement.style.display = 'block';
+        outputElement.innerHTML = '<div class="flex items-center justify-center gap-2"><div class="loader"></div><p>Analisando com IA...</p></div>';
+        
+        const apiKey = "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"; // Your Groq API Key
+        const apiUrl = "https://api.groq.com/openai/v1/chat/completions";
+        
+        const payload = {
+            model: "llama3-8b-8192", // Using a fast model from Groq
+            messages: [
+                { 
+                    role: "system", 
+                    content: "Você é um analista de dados especialista em marketing de produtos de beleza. Responda sempre em português do Brasil." 
+                },
+                { 
+                    role: "user", 
+                    content: prompt 
+                }
+            ]
+        };
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody}`);
+            }
+            
+            const result = await response.json();
+            
+            if (result.choices && result.choices.length > 0 && result.choices[0].message) {
+                let text = result.choices[0].message.content;
+                text = text.replace(/\*/g, '').replace(/\n/g, '<br>'); // Remove asterisks and format line breaks
+                outputElement.innerHTML = text;
+            } else {
+                outputElement.textContent = 'Não foi possível obter uma resposta da IA. A resposta não continha o texto esperado.';
+            }
+        } catch (error) {
+            console.error("LLM API call failed:", error);
+            outputElement.textContent = 'Erro ao conectar com a IA. Verifique o console para mais detalhes.';
+        } finally {
+            buttonElement.disabled = false;
+        }
+    }
+
+    function generateDashboardInsight() {
+        modalTitle.textContent = "Análise de IA dos Dados Atuais";
+        modalContent.innerHTML = `<div id="ai-insight-output" class="p-4 bg-gray-50 dark:bg-dark-bg rounded-lg"></div>`;
+        openModal();
+        
+        const outputElement = document.getElementById('ai-insight-output');
+        const prompt = `
+            Analise os dados do dashboard que compara as marcas 'Suave' e 'Evaus' e forneça um resumo executivo descritivo e direto.
+            
+            Contexto: A tese central é que a embalagem e a imagem da marca ('Evaus') superam a qualidade intrínseca do produto, que é similar à da marca 'Suave'.
+            
+            Dados da Visão Atual:
+            - Filtro de Canal: ${filterChannel.options[filterChannel.selectedIndex].text}
+            - Filtro de Produto: ${filterProduct.options[filterProduct.selectedIndex].text}
+            
+            Com base nos gráficos, explique como a marca 'Evaus', mesmo sendo mais cara, obteve mais vendas e menções positivas que a 'Suave'.
+            Destaque como o engajamento no TikTok e as vendas em e-commerces para a 'Evaus' confirmam a tese.
+            Conclua com uma recomendação sobre o poder do branding e da embalagem para profissionais de produto e marca.
+            
+            IMPORTANTE: Gere a resposta como um texto corrido, sem usar asteriscos, markdown ou qualquer tipo de formatação.
+        `;
+        callLLMAPI(prompt, aiInsightBtn, outputElement);
+    }
+
+    // --- EVENT LISTENERS ---
+    [filterBrand, filterChannel, filterProduct].forEach(filter => {
+        filter.addEventListener('change', updateDashboard);
+    });
+    
+    aiInsightBtn.addEventListener('click', generateDashboardInsight);
+    
+    document.querySelectorAll('.info-icon').forEach(icon => {
+        icon.addEventListener('click', (e) => {
+            showInfoModal(e.target.dataset.chartId);
+        });
+    });
+
+    // --- INITIALIZE DASHBOARD ---
+    window.addEventListener('load', () => {
+        const isDark = localStorage.getItem('theme') === 'dark';
+        themeToggle.checked = isDark;
+        if(isDark) document.documentElement.classList.add('dark');
+        updateDashboard();
+    });
+
+    window.addEventListener('beforeunload', () => {
+        localStorage.setItem('theme', themeToggle.checked ? 'dark' : 'light');
+    });
+
+    </script>
+</body>
+</html>
